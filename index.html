@@ -1,0 +1,56 @@
+ <!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý điểm số</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body id="main-app-page">
+    <div class="container">
+        <h1>Quản lý điểm số</h1>
+        <div id="user-info">
+            Xin chào, <span id="current-username"></span>! <button id="logout-btn">Đăng xuất</button>
+        </div>
+        <button id="add-student-btn">Thêm sinh viên</button>
+
+        <table id="grade-table">
+            <thead>
+                <tr>
+                    <th>STT</th>
+                    <th>Tên sinh viên</th>
+                    <th>Điểm TX1</th>
+                    <th>Điểm TX2</th>
+                    <th>Điểm TX3</th>
+                    <th>Điểm TX4</th>
+                    <th>Điểm GK</th>
+                    <th>Điểm CK</th>
+                    <th>Điểm TB</th>
+                    <th>Hành động</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Dữ liệu sinh viên sẽ được thêm vào đây bằng JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <div id="add-student-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Thêm sinh viên mới</h2>
+            <form id="add-student-form">
+                <label for="student-name">Tên sinh viên:</label>
+                <input type="text" id="student-name" required>
+                <button type="submit">Thêm</button>
+            </form>
+        </div>
+    </div>
+
+    <footer>
+        <p>Ứng dụng được phát triển bởi Nguyễn Trường Huy</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
