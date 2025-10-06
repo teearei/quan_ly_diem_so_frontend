@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         async function fetchStudents() {
             try {
-                const response = await authenticatedFetch(`${API_BASE_URL}/students`);
+                const response = await authenticatedFetch(`${API_BASE_URL}/users/students`);
                 if (response.ok) {
                     students = await response.json();
                     renderStudents();
