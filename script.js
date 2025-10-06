@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- Global variables and utility functions ---
-    const API_BASE_URL = 'https://quan-ly-diem-so-backend.onrender.com'; // URL của backend server
+    const API_BASE_URL = 'https://quan-ly-diem-so-backend.onrender.com/api'; // URL của backend server
     let currentUserToken = localStorage.getItem('token');
     let currentUsername = localStorage.getItem('username');
 
