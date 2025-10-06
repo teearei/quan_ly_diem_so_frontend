@@ -1,12 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- Global variables and utility functions ---
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    const users = JSON.parse(localStorage.getItem('users')) || {};
+    const API_BASE_URL = 'https://quan-ly-diem-so-backend.onrender.com'; // URL của backend server
+    let currentUserToken = localStorage.getItem('token');
+    let currentUsername = localStorage.getItem('username');
 
-    // Determine current page
-    const currentPageId = document.body.id; // Lấy ID của body hiện tại
+    const currentPageId = document.body.id;
 
-    // Function to calculate average score (giữ nguyên)
+    // Hàm để tính điểm trung bình (giữ nguyên)
     function calculateAverage(scores) {
         let totalScore = 0;
         let totalWeight = 0;
@@ -32,54 +32,79 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Authentication (Login/Register) ---
-    // Chỉ chạy code đăng nhập nếu đang ở trang login
     if (currentPageId === 'login-page') {
         const loginForm = document.getElementById('login-form');
         if (loginForm) {
-            loginForm.addEventListener('submit', (e) => {
+            loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const username = document.getElementById('login-username').value;
                 const password = document.getElementById('login-password').value;
 
-                if (users[username] && users[username].password === password) {
-                    localStorage.setItem('currentUser', JSON.stringify({ username: username }));
-                    alert('Đăng nhập thành công!');
-                    window.location.href = 'index.html';
-                } else {
-                    alert('Tên đăng nhập hoặc mật khẩu không đúng!');
+                try {
+                    const response = await fetch(`${API_BASE_URL}/login`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('username', data.username);
+                        currentUserToken = data.token;
+                        currentUsername = data.username;
+                        alert('Đăng nhập thành công!');
+                        window.location.href = 'index.html';
+                    } else {
+                        alert(data.message || 'Đăng nhập thất bại.');
+                    }
+                } catch (error) {
+                    console.error('Lỗi đăng nhập:', error);
+                    alert('Không thể kết nối đến máy chủ hoặc có lỗi xảy ra.');
                 }
             });
         }
     }
 
-    // Chỉ chạy code đăng ký nếu đang ở trang register
     if (currentPageId === 'register-page') {
         const registerForm = document.getElementById('register-form');
         if (registerForm) {
-            registerForm.addEventListener('submit', (e) => {
+            registerForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const username = document.getElementById('register-username').value;
                 const password = document.getElementById('register-password').value;
 
-                if (users[username]) {
-                    alert('Tên đăng nhập đã tồn tại!');
-                } else {
-                    users[username] = {
-                        password: password,
-                        students: []
-                    };
-                    localStorage.setItem('users', JSON.stringify(users));
-                    alert('Đăng ký thành công! Vui lòng đăng nhập.');
-                    window.location.href = 'login.html';
+                try {
+                    const response = await fetch(`${API_BASE_URL}/register`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        alert(data.message);
+                        window.location.href = 'login.html';
+                    } else {
+                        alert(data.message || 'Đăng ký thất bại.');
+                    }
+                } catch (error) {
+                    console.error('Lỗi đăng ký:', error);
+                    alert('Không thể kết nối đến máy chủ hoặc có lỗi xảy ra.');
                 }
             });
         }
     }
 
     // --- Main application (index.html) ---
-    // Chỉ chạy code chính nếu đang ở trang index (hoặc không phải login/register)
     if (currentPageId !== 'login-page' && currentPageId !== 'register-page') {
-        if (!currentUser) {
+        if (!currentUserToken) {
             window.location.href = 'login.html'; // Redirect if not logged in
             return;
         }
@@ -93,18 +118,50 @@ document.addEventListener('DOMContentLoaded', () => {
         const addStudentForm = document.getElementById('add-student-form');
         const studentNameInput = document.getElementById('student-name');
 
-        currentUsernameSpan.textContent = currentUser.username;
+        currentUsernameSpan.textContent = currentUsername;
 
         logoutBtn.addEventListener('click', () => {
-            localStorage.removeItem('currentUser');
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            currentUserToken = null;
+            currentUsername = null;
             window.location.href = 'login.html';
         });
 
-        let students = users[currentUser.username].students;
+        let students = []; // Dữ liệu sinh viên sẽ được tải từ server
 
-        function saveStudentData() {
-            users[currentUser.username].students = students;
-            localStorage.setItem('users', JSON.stringify(users));
+        // Hàm chung để gửi request đã xác thực
+        async function authenticatedFetch(url, options = {}) {
+            options.headers = {
+                ...options.headers,
+                'Authorization': `Bearer ${currentUserToken}`
+            };
+            const response = await fetch(url, options);
+            if (response.status === 401 || response.status === 403) {
+                // Token hết hạn hoặc không hợp lệ, yêu cầu đăng nhập lại
+                alert('Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.');
+                localStorage.removeItem('token');
+                localStorage.removeItem('username');
+                window.location.href = 'login.html';
+                throw new Error('Unauthorized');
+            }
+            return response;
+        }
+
+
+        async function fetchStudents() {
+            try {
+                const response = await authenticatedFetch(`${API_BASE_URL}/students`);
+                if (response.ok) {
+                    students = await response.json();
+                    renderStudents();
+                } else {
+                    alert('Không thể tải dữ liệu sinh viên.');
+                }
+            } catch (error) {
+                console.error('Lỗi khi lấy danh sách sinh viên:', error);
+                // Xử lý lỗi (ví dụ: hiển thị thông báo)
+            }
         }
 
         function renderStudents() {
@@ -116,7 +173,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.insertCell().textContent = index + 1; // STT
                 row.insertCell().textContent = student.name; // Tên sinh viên
 
-                const scoreInputs = {};
                 ['diemTX1', 'diemTX2', 'diemTX3', 'diemTX4', 'diemGK', 'diemCK'].forEach(scoreKey => {
                     const cell = row.insertCell();
                     const input = document.createElement('input');
@@ -126,19 +182,43 @@ document.addEventListener('DOMContentLoaded', () => {
                     input.step = '0.1';
                     input.value = student.scores[scoreKey] !== undefined ? student.scores[scoreKey] : '';
                     input.dataset.scoreKey = scoreKey;
-                    input.addEventListener('input', (e) => {
+                    input.addEventListener('change', async (e) => { // Dùng 'change' thay vì 'input' để gửi lên server khi focus out
                         let value = parseFloat(e.target.value);
                         if (isNaN(value) || value < 0 || value > 10) {
-                            e.target.value = '';
+                            e.target.value = ''; // Clear invalid input
                             student.scores[scoreKey] = undefined;
                         } else {
                             student.scores[scoreKey] = value;
                         }
-                        saveStudentData();
-                        updateAverageScore(row, student);
+
+                        // Gửi yêu cầu cập nhật lên server
+                        try {
+                            const response = await authenticatedFetch(`${API_BASE_URL}/students/${student.id}`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ scores: { [scoreKey]: student.scores[scoreKey] } })
+                            });
+
+                            if (!response.ok) {
+                                alert('Cập nhật điểm thất bại.');
+                                // Có thể fetch lại dữ liệu gốc nếu cập nhật lỗi
+                                fetchStudents();
+                            } else {
+                                const updatedStudent = await response.json();
+                                // Cập nhật student trong mảng students của frontend
+                                Object.assign(student, updatedStudent);
+                            }
+                        } catch (error) {
+                            console.error('Lỗi khi cập nhật điểm:', error);
+                            alert('Không thể kết nối đến máy chủ để cập nhật điểm.');
+                            // Có thể fetch lại dữ liệu gốc nếu có lỗi mạng
+                            fetchStudents();
+                        }
+                        updateAverageScore(row, student); // Cập nhật điểm TB trên giao diện ngay lập tức
                     });
                     cell.appendChild(input);
-                    scoreInputs[scoreKey] = input;
                 });
 
                 const diemTBCell = row.insertCell();
@@ -149,11 +229,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 const deleteBtn = document.createElement('button');
                 deleteBtn.textContent = 'Xóa';
                 deleteBtn.classList.add('action-btn', 'delete');
-                deleteBtn.addEventListener('click', () => {
+                deleteBtn.addEventListener('click', async () => {
                     if (confirm(`Bạn có chắc chắn muốn xóa sinh viên "${student.name}"?`)) {
-                        students = students.filter(s => s.id !== student.id);
-                        saveStudentData();
-                        renderStudents();
+                        try {
+                            const response = await authenticatedFetch(`${API_BASE_URL}/students/${student.id}`, {
+                                method: 'DELETE'
+                            });
+
+                            if (response.ok) {
+                                alert('Xóa sinh viên thành công!');
+                                fetchStudents(); // Tải lại danh sách sinh viên sau khi xóa
+                            } else {
+                                alert('Xóa sinh viên thất bại.');
+                            }
+                        } catch (error) {
+                            console.error('Lỗi khi xóa sinh viên:', error);
+                            alert('Không thể kết nối đến máy chủ để xóa sinh viên.');
+                        }
                     }
                 });
                 actionsCell.appendChild(deleteBtn);
@@ -189,32 +281,36 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        addStudentForm.addEventListener('submit', (e) => {
+        addStudentForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const studentName = studentNameInput.value.trim();
             if (studentName) {
-                const newStudent = {
-                    id: Date.now(),
-                    name: studentName,
-                    scores: {
-                        diemTX1: undefined,
-                        diemTX2: undefined,
-                        diemTX3: undefined,
-                        diemTX4: undefined,
-                        diemGK: undefined,
-                        diemCK: undefined
+                try {
+                    const response = await authenticatedFetch(`${API_BASE_URL}/students`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ name: studentName })
+                    });
+
+                    if (response.ok) {
+                        alert('Thêm sinh viên thành công!');
+                        addStudentModal.style.display = 'none';
+                        addStudentForm.reset();
+                        fetchStudents(); // Tải lại danh sách sinh viên sau khi thêm
+                    } else {
+                        alert('Thêm sinh viên thất bại.');
                     }
-                };
-                students.push(newStudent);
-                saveStudentData();
-                renderStudents();
-                addStudentModal.style.display = 'none';
-                addStudentForm.reset();
+                } catch (error) {
+                    console.error('Lỗi khi thêm sinh viên:', error);
+                    alert('Không thể kết nối đến máy chủ để thêm sinh viên.');
+                }
             } else {
                 alert('Tên sinh viên không được để trống.');
             }
         });
 
-        renderStudents(); // Initial render
+        fetchStudents(); // Tải dữ liệu sinh viên khi trang được load
     }
 });
